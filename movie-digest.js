@@ -1,35 +1,23 @@
-#!/usr/bin/env node
-/**
-
-- ╔══════════════════════════════════════════════════════╗
-- ║         Movie Rating Sentinel — Daily Digest         ║
-- ║  Parses DrunkenSlug RSS → filters by IMDb rating     ║
-- ║  → sends HTML email via SendGrid                     ║
-- ╚══════════════════════════════════════════════════════╝
-- 
-- SETUP:
-- npm install node-fetch xml2js @sendgrid/mail dotenv
-- 
-- ENVIRONMENT VARIABLES (.env file):
-- RSS_FEED_URL=https://drunkenslug.com/rss?t=2000&dl=1&i=…&r=…
-- SENDGRID_API_KEY=your_sendgrid_key    # free at sendgrid.com
-- EMAIL_FROM=noreply@yourdomain.com
-- EMAIL_TO=you@example.com
-- 
-- No OMDb or AI API needed — ratings come straight from the RSS feed!
-- 
-- CRON (6 AM EST = 11:00 UTC):
-- 0 11 * * * cd /path/to/movie-digest && node movie-digest.js
-  */
+// Movie Rating Sentinel - Daily Digest
+// Parses DrunkenSlug RSS, filters by IMDb rating, sends email via SendGrid
+//
+// SETUP:
+//   npm install node-fetch xml2js @sendgrid/mail dotenv
+//
+// SECRETS NEEDED:
+//   RSS_FEED_URL, SENDGRID_API_KEY, EMAIL_FROM, EMAIL_TO
+//
+// CRON (6 AM EST = 11:00 UTC):
+//   0 11 * * * cd /path/to/movie-digest && node movie-digest.js
 
 “use strict”;
 
 require(“dotenv”).config();
-const fetch   = (…args) => import(“node-fetch”).then(({ default: f }) => f(…args));
-const xml2js  = require(“xml2js”);
-const sgMail  = require(”@sendgrid/mail”);
+const fetch  = (…args) => import(“node-fetch”).then(({ default: f }) => f(…args));
+const xml2js = require(“xml2js”);
+const sgMail = require(”@sendgrid/mail”);
 
-// ── Config ────────────────────────────────────────────────────────────────────
+// – Config —————————————————————––
 
 const CONFIG = {
 rssFeedUrl:    process.env.RSS_FEED_URL     || “”,
@@ -39,7 +27,7 @@ emailTo:       process.env.EMAIL_TO         || “”,
 imdbThreshold: parseFloat(process.env.IMDB_THRESHOLD || “8.0”),
 };
 
-// ── Logging ───────────────────────────────────────────────────────────────────
+// – Logging ——————————————————————
 
 const log = {
 info:    (m) => console.log(`[INFO]  ${new Date().toISOString()}  ${m}`),
@@ -48,7 +36,7 @@ error:   (m) => console.error(`[ERROR] ${new Date().toISOString()}  ${m}`),
 success: (m) => console.log(`[OK]    ${new Date().toISOString()}  ${m}`),
 };
 
-// ── Step 1: Fetch RSS ─────────────────────────────────────────────────────────
+// – Step 1: Fetch RSS ––––––––––––––––––––––––––––
 
 async function fetchFeed(url) {
 log.info(“Fetching RSS feed…”);
@@ -64,7 +52,7 @@ log.info(`Feed returned ${arr.length} items`);
 return arr;
 }
 
-// ── Step 2: Parse each item ───────────────────────────────────────────────────
+// – Step 2: Parse each item –––––––––––––––––––––––––
 
 function extractText(html, label) {
 const re = new RegExp(`<li>${label}:\\s*([^<]+)<`, “i”);
@@ -93,7 +81,7 @@ const ratingStr = extractText(desc, “Rating”);
 const imdb      = ratingStr ? parseFloat(ratingStr) : null;
 
 // Strip resolution/codec/release group from title
-// e.g. “Project Hail Mary 2026 2160p WebRip Atmos…” → “Project Hail Mary”
+// e.g. “Project Hail Mary 2026 2160p WebRip…” -> “Project Hail Mary”
 const titleMatch = rawTitle.match(/^(.+?)\s+(?:19|20)\d{2}\b/);
 const cleanTitle = titleMatch
 ? titleMatch[1].replace(/./g, “ “).trim()
@@ -111,7 +99,7 @@ const poster = posterMatch ? posterMatch[1] : null;
 return { rawTitle, cleanTitle, year, imdb, genre, director, actors, plot, poster, imdbId };
 }
 
-// ── Step 3: Filter ────────────────────────────────────────────────────────────
+// – Step 3: Filter ———————————————————–
 
 function filterMovies(items) {
 const seen   = new Set();
@@ -131,10 +119,10 @@ if (seen.has(key)) continue;
 seen.add(key);
 
 if (movie.imdb >= CONFIG.imdbThreshold) {
-  log.success(`  ✅ PASS  "${movie.cleanTitle}" (${movie.year}) — IMDb ${movie.imdb}`);
+  log.success(`  PASS "${movie.cleanTitle}" (${movie.year}) - IMDb ${movie.imdb}`);
   passed.push(movie);
 } else {
-  log.info(`  ❌ skip  "${movie.cleanTitle}" (${movie.year}) — IMDb ${movie.imdb}`);
+  log.info(`  skip "${movie.cleanTitle}" (${movie.year}) - IMDb ${movie.imdb}`);
 }
 ```
 
@@ -143,7 +131,7 @@ if (movie.imdb >= CONFIG.imdbThreshold) {
 return passed;
 }
 
-// ── Step 4: Build Email ───────────────────────────────────────────────────────
+// – Step 4: Build Email ——————————————————
 
 function buildHTML(movies) {
 const date = new Date().toLocaleDateString(“en-US”, {
@@ -152,8 +140,8 @@ weekday: “long”, year: “numeric”, month: “long”, day: “numeric”,
 
 const cards = movies.map((m) => `<tr> <td style="padding:20px 0;border-bottom:1px solid #1e293b;"> <table width="100%" cellpadding="0" cellspacing="0"><tr> ${m.poster ?`<td width="80" valign="top" style="padding-right:16px;">
 <img src="${m.poster}" width="80" style="border-radius:6px;display:block;" alt="${m.cleanTitle}">
-</td>`: ""} <td valign="top"> <p style="margin:0 0 6px;font-size:18px;font-weight:600;color:#f1f5f9;"> ${m.cleanTitle} <span style="font-size:13px;color:#475569;font-weight:400;">(${m.year || "N/A"})</span> </p> <p style="margin:0 0 10px;"> <span style="background:#14532d;color:#86efac;padding:3px 10px;border-radius:4px;font-size:13px;font-family:monospace;"> ⭐ IMDb ${m.imdb}/10 </span> </p> ${m.genre    ?`<p style="margin:0 0 3px;font-size:12px;color:#64748b;">${m.genre}</p>`: ""} ${m.director ?`<p style="margin:0 0 3px;font-size:12px;color:#64748b;">Dir. ${m.director}</p>`: ""} ${m.actors   ?`<p style="margin:0 0 6px;font-size:12px;color:#475569;">Cast: ${m.actors}</p>`: ""} ${m.plot     ?`<p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">${m.plot}</p>`: ""} ${m.imdbId   ?`<p style="margin:8px 0 0;">
-<a href="https://www.imdb.com/title/tt${m.imdbId}/" style="color:#818cf8;font-size:12px;text-decoration:none;">View on IMDb →</a>
+</td>`: ""} <td valign="top"> <p style="margin:0 0 6px;font-size:18px;font-weight:600;color:#f1f5f9;"> ${m.cleanTitle} <span style="font-size:13px;color:#475569;font-weight:400;">(${m.year || "N/A"})</span> </p> <p style="margin:0 0 10px;"> <span style="background:#14532d;color:#86efac;padding:3px 10px;border-radius:4px;font-size:13px;font-family:monospace;"> IMDb ${m.imdb}/10 </span> </p> ${m.genre    ?`<p style="margin:0 0 3px;font-size:12px;color:#64748b;">${m.genre}</p>`: ""} ${m.director ?`<p style="margin:0 0 3px;font-size:12px;color:#64748b;">Dir. ${m.director}</p>`: ""} ${m.actors   ?`<p style="margin:0 0 6px;font-size:12px;color:#475569;">Cast: ${m.actors}</p>`: ""} ${m.plot     ?`<p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">${m.plot}</p>`: ""} ${m.imdbId   ?`<p style="margin:8px 0 0;">
+<a href="https://www.imdb.com/title/tt${m.imdbId}/" style="color:#818cf8;font-size:12px;text-decoration:none;">View on IMDb</a>
 </p>` : ""} </td> </tr></table> </td> </tr>`).join(””);
 
 const emptyMsg = ` <tr><td style="padding:32px 0;text-align:center;color:#475569;font-size:14px;"> No movies rated ${CONFIG.imdbThreshold}+ were found in today's feed. </td></tr>`;
@@ -169,9 +157,9 @@ return `<!DOCTYPE html>
 
 ```
 <tr><td style="background:linear-gradient(135deg,#1a0a2e,#0f0a1e);border-radius:12px 12px 0 0;padding:36px 32px;border-bottom:1px solid #1e293b;">
-  <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.3em;color:#7c3aed;font-family:monospace;text-transform:uppercase;">◈ Movie Rating Sentinel</p>
+  <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.3em;color:#7c3aed;font-family:monospace;text-transform:uppercase;">Movie Rating Sentinel</p>
   <h1 style="margin:0 0 8px;font-size:28px;font-weight:400;color:#f1f5f9;letter-spacing:-0.02em;">
-    🎬 Your Daily <em style="color:#818cf8;">Top Films</em>
+    Your Daily Top Films
   </h1>
   <p style="margin:0;font-size:13px;color:#475569;">${date}</p>
 </td></tr>
@@ -179,7 +167,7 @@ return `<!DOCTYPE html>
 <tr><td style="background:#0f172a;padding:14px 32px;border-bottom:1px solid #1e293b;">
   <p style="margin:0;font-size:13px;color:#64748b;font-family:monospace;">
     <strong style="color:#818cf8;">${movies.length} film${movies.length !== 1 ? "s" : ""}</strong>
-    rated IMDb ≥ ${CONFIG.imdbThreshold}/10 in today's feed
+    rated IMDb &gt;= ${CONFIG.imdbThreshold}/10 in today's feed
   </p>
 </td></tr>
 
@@ -191,7 +179,7 @@ return `<!DOCTYPE html>
 
 <tr><td style="padding:20px 0 0;text-align:center;">
   <p style="margin:0;font-size:11px;color:#334155;font-family:monospace;">
-    Movie Rating Sentinel · Automated daily digest · Ratings sourced from feed
+    Movie Rating Sentinel - Automated daily digest - Ratings sourced from feed
   </p>
 </td></tr>
 ```
@@ -205,31 +193,31 @@ return `<!DOCTYPE html>
 function buildPlainText(movies) {
 const date = new Date().toLocaleDateString(“en-US”, { dateStyle: “full” });
 const lines = movies.map((m, i) =>
-`${i + 1}. ${m.cleanTitle} (${m.year || "N/A"}) — IMDb ${m.imdb}/10\n` +
+`${i + 1}. ${m.cleanTitle} (${m.year || "N/A"}) - IMDb ${m.imdb}/10\n` +
 (m.genre    ? `   Genre: ${m.genre}\n`    : “”) +
 (m.director ? `   Dir: ${m.director}\n`   : “”) +
 (m.plot     ? `   ${m.plot}\n`            : “”) +
 (m.imdbId   ? `   https://www.imdb.com/title/tt${m.imdbId}/\n` : “”)
 );
 return [
-“🎬 Movie Rating Sentinel — Daily Digest”,
+“Movie Rating Sentinel - Daily Digest”,
 date,
-`Filter: IMDb ≥ ${CONFIG.imdbThreshold}/10`,
+`Filter: IMDb >= ${CONFIG.imdbThreshold}/10`,
 “”,
 `${movies.length} top-rated film(s) today:`,
-“─”.repeat(50),
+“-”.repeat(50),
 …lines,
-“─”.repeat(50),
+“-”.repeat(50),
 ].join(”\n”);
 }
 
-// ── Step 5: Send Email ────────────────────────────────────────────────────────
+// – Step 5: Send Email —————————————————––
 
 async function sendEmail(movies) {
 sgMail.setApiKey(CONFIG.sendgridKey);
 const subject = movies.length
-? `🎬 ${movies.length} Top-Rated Film${movies.length > 1 ? "s" : ""} Today — Movie Digest`
-: “🎬 Movie Digest — No Top-Rated Films Today”;
+? `${movies.length} Top-Rated Film${movies.length > 1 ? "s" : ""} Today - Movie Digest`
+: “Movie Digest - No Top-Rated Films Today”;
 
 await sgMail.send({
 to:      CONFIG.emailTo,
@@ -238,17 +226,17 @@ subject,
 text:    buildPlainText(movies),
 html:    buildHTML(movies),
 });
-log.success(`Email sent → ${CONFIG.emailTo} | "${subject}"`);
+log.success(`Email sent to ${CONFIG.emailTo} | "${subject}"`);
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// – Main ———————————————————————
 
 async function main() {
-log.info(“═══ Movie Rating Sentinel starting ═══”);
+log.info(”=== Movie Rating Sentinel starting ===”);
 
 const missing = [“rssFeedUrl”, “sendgridKey”, “emailFrom”, “emailTo”].filter((k) => !CONFIG[k]);
 if (missing.length) {
-log.error(`Missing config: ${missing.join(", ")} — check your .env / GitHub Secrets`);
+log.error(`Missing config: ${missing.join(", ")} - check your GitHub Secrets`);
 process.exit(1);
 }
 
@@ -257,10 +245,10 @@ const items     = await fetchFeed(CONFIG.rssFeedUrl);
 const topMovies = filterMovies(items);
 
 ```
-log.info(`─── ${topMovies.length} / ${items.length} movies passed IMDb ≥ ${CONFIG.imdbThreshold} ───`);
+log.info(`${topMovies.length} / ${items.length} movies passed IMDb >= ${CONFIG.imdbThreshold}`);
 
 await sendEmail(topMovies);
-log.info("═══ Done ═══");
+log.info("=== Done ===");
 ```
 
 } catch (err) {
