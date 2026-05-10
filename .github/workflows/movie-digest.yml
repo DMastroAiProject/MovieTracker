@@ -1,0 +1,37 @@
+name: Movie Rating Digest
+
+on:
+  # Runs at 11:00 UTC = 6:00 AM EST daily
+  schedule:
+    - cron: "0 11 * * *"
+
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm install node-fetch xml2js @sendgrid/mail dotenv
+
+      - name: Run Movie Digest
+        env:
+          RSS_FEED_URL:       ${{ secrets.RSS_FEED_URL }}
+          OMDB_API_KEY:       ${{ secrets.OMDB_API_KEY }}
+          SENDGRID_API_KEY:   ${{ secrets.SENDGRID_API_KEY }}
+          EMAIL_FROM:         ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO:           ${{ secrets.EMAIL_TO }}
+          IMDB_THRESHOLD:     "8.0"
+          RT_THRESHOLD:       "80"
+          MAX_MOVIES:         "30"
+        run: node movie-digest.js
