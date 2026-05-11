@@ -24,7 +24,8 @@ rssFeedUrl:       process.env.RSS_FEED_URL        || "",
 gmailUser:        process.env.GMAIL_USER           || "",
 gmailAppPassword: process.env.GMAIL_APP_PASSWORD   || "",
 emailTo:          process.env.EMAIL_TO             || "",
-imdbThreshold:    parseFloat(process.env.IMDB_THRESHOLD || "8.0"),
+imdbThreshold: parseFloat(process.env.IMDB_THRESHOLD || "8.0"),
+rtThreshold:   parseFloat(process.env.RT_THRESHOLD   || "70"),
 };
 
 // – Logging ——————————————————————
@@ -82,10 +83,11 @@ const imdb      = ratingStr ? parseFloat(ratingStr) : null;
 
 // Strip resolution/codec/release group from title
 // e.g. "Project Hail Mary 2026 2160p WebRip…" -> "Project Hail Mary"
-const titleMatch = rawTitle.match(/^(.+?)\s+(?:19|20)\d{2}\b/);
+const normalized = rawTitle.replace(/\./g, " ");
+const titleMatch = normalized.match(/^(.+?)\s+(?:19|20)\d{2}\b/);
 const cleanTitle = titleMatch
   ? titleMatch[1].trim()
-  : rawTitle.replace(/\s+(1080p|2160p|720p|BluRay|WEB|HDTV|REMUX|REPACK|MULTI|DV|HDR|PROPER|REPACK|IMAX|EXTENDED|THEATRICAL|DC|UNRATED).*/i, "").trim();
+  : normalized.replace(/\s+(1080p|2160p|720p|BluRay|WEB|HDTV|REMUX|REPACK|MULTI|DV|HDR|PROPER|IMAX|EXTENDED|THEATRICAL|UNRATED|AMZN|NF|WEBDL|WEBRip|x264|x265|HEVC|AAC|DD|DTS|ATMOS|ANARCHY|BYNDR|HDH).*/i, "").trim();
 
 const year     = extractText(desc, "Year");
 const genre    = extractText(desc, "Genre");
@@ -117,7 +119,7 @@ const key = `${movie.cleanTitle.toLowerCase()}|${movie.year}`;
 if (seen.has(key)) continue;
 seen.add(key);
 
-if (movie.imdb >= CONFIG.imdbThreshold) {
+if (movie.imdb >= CONFIG.imdbThreshold || (movie.rt !== null && movie.rt >= CONFIG.rtThreshold)) {
   log.success(`  PASS "${movie.cleanTitle}" (${movie.year}) - IMDb ${movie.imdb}`);
   passed.push(movie);
 } else {
