@@ -28,5 +28,6 @@ jobs:
           GMAIL_APP_PASSWORD:  ${{ secrets.GMAIL_APP_PASSWORD }}
           EMAIL_TO:            ${{ secrets.EMAIL_TO }}
           IMDB_THRESHOLD:      "8.0"
+          RT_THRESHOLD:         "70"
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         run: node movie-digest.js
