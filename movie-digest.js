@@ -84,8 +84,8 @@ const imdb      = ratingStr ? parseFloat(ratingStr) : null;
 // e.g. "Project Hail Mary 2026 2160p WebRip…" -> "Project Hail Mary"
 const titleMatch = rawTitle.match(/^(.+?)\s+(?:19|20)\d{2}\b/);
 const cleanTitle = titleMatch
-? titleMatch[1].replace(/[^\w\s]/g, " ").trim()
-: rawTitle.replace(/[^\w\s]/g, " ").replace(/\s+(1080p|2160p|720p|BluRay|WEB|HDTV|REMUX|REPACK).*/i, "").trim();
+  ? titleMatch[1].trim()
+  : rawTitle.replace(/\s+(1080p|2160p|720p|BluRay|WEB|HDTV|REMUX|REPACK|MULTI|DV|HDR|PROPER|REPACK|IMAX|EXTENDED|THEATRICAL|DC|UNRATED).*/i, "").trim();
 
 const year     = extractText(desc, "Year");
 const genre    = extractText(desc, "Genre");
