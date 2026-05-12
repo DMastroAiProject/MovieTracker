@@ -112,7 +112,10 @@ function filterMovies(items) {
     const key = movie.cleanTitle.toLowerCase().trim();
     if (!key || seen.has(key)) continue;
     seen.add(key);
-
+    
+    // Only include 2026 movies
+    if (movie.year !== "2026") continue;
+    
     passed.push(movie);
 
     // Cap at 50 movies
