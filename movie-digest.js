@@ -24,8 +24,6 @@ rssFeedUrl:       process.env.RSS_FEED_URL        || "",
 gmailUser:        process.env.GMAIL_USER           || "",
 gmailAppPassword: process.env.GMAIL_APP_PASSWORD   || "",
 emailTo:          process.env.EMAIL_TO             || "",
-imdbThreshold: parseFloat(process.env.IMDB_THRESHOLD || "8.0"),
-rtThreshold:   parseFloat(process.env.RT_THRESHOLD   || "70"),
 };
 
 // – Logging ——————————————————————
@@ -104,31 +102,24 @@ return { rawTitle, cleanTitle, year, imdb, genre, director, actors, plot, poster
 // – Step 3: Filter ———————————————————–
 
 function filterMovies(items) {
-const seen   = new Set();
-const passed = [];
+  const seen   = new Set();
+  const passed = [];
 
-for (const item of items) {
-const movie = parseItem(item);
+  for (const item of items) {
+    const movie = parseItem(item);
 
-if (movie.imdb === null) {
-  log.info(`  skip (no rating): "${movie.cleanTitle}"`);
-  continue;
-}
+    // Deduplicate by title only
+    const key = movie.cleanTitle.toLowerCase().trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
 
-const key = `${movie.cleanTitle.toLowerCase()}|${movie.year}`;
-if (seen.has(key)) continue;
-seen.add(key);
+    passed.push(movie);
 
-if (movie.imdb >= CONFIG.imdbThreshold || (movie.rt !== null && movie.rt >= CONFIG.rtThreshold)) {
-  log.success(`  PASS "${movie.cleanTitle}" (${movie.year}) - IMDb ${movie.imdb}`);
-  passed.push(movie);
-} else {
-  log.info(`  skip "${movie.cleanTitle}" (${movie.year}) - IMDb ${movie.imdb}`);
-}
+    // Cap at 50 movies
+    if (passed.length >= 50) break;
+  }
 
-}
-
-return passed;
+  return passed;
 }
 
 // – Step 4: Build Email ——————————————————
